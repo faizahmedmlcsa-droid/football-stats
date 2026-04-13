@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football Stats — Stadium Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@300;400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --pitch: #1a7a3a;
+  --pitch-light: #22963f;
+  --pitch-dark: #12612e;
+  --grass: #0d4f20;
+  --white: #f5f5f0;
+  --yellow: #ffe135;
+  --red: #e8002d;
+  --sky: #87ceeb;
+  --light-line: rgba(255,255,255,0.12);
+  --card-border: rgba(255,255,255,0.1);
+  --text: #f0f0e8;
+  --muted: rgba(255,255,255,0.45);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Rajdhani', sans-serif;
+  background: var(--grass);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(180deg, rgba(0,0,0,0.07) 0px, rgba(0,0,0,0.07) 60px, transparent 60px, transparent 120px);
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+  width: 140%; height: 400px;
+  background: radial-gradient(ellipse, rgba(255,255,200,0.1) 0%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+nav {
+  position: fixed; top:0; left:0; right:0; z-index:100;
+  background: rgba(8,35,16,0.96);
+  backdrop-filter: blur(12px);
+  border-bottom: 2px solid rgba(255,225,53,0.2);
+}
+.nav-inner {
+  max-width: 1300px; margin:0 auto; padding:0 28px;
+  display:flex; align-items:center; justify-content:space-between; height:64px;
+}
+.nav-logo { display:flex; align-items:center; gap:10px; }
+.nav-ball {
+  width:38px; height:38px; background:var(--yellow); border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:20px;
+  box-shadow:0 0 20px rgba(255,225,53,0.5);
+  animation: spin-slow 6s linear infinite;
+}
+@keyframes spin-slow { to{transform:rotate(360deg)} }
+.nav-brand { font-family:'Anton',sans-serif; font-size:20px; letter-spacing:3px; }
+.nav-brand span { color:var(--yellow); }
+.nav-tabs { display:flex; gap:4px; }
+.nav-tab {
+  padding:7px 20px; border-radius:6px;
+  background:transparent; border:1px solid transparent;
+  color:var(--muted);
+  font-family:'Oswald',sans-serif; font-size:14px; font-weight:500;
+  letter-spacing:2px; text-transform:uppercase;
+  cursor:pointer; transition:all 0.2s;
+}
+.nav-tab:hover { color:var(--white); background:rgba(255,255,255,0.05); }
+.nav-tab.active { color:var(--yellow); background:rgba(255,225,53,0.1); border-color:rgba(255,225,53,0.3); }
+.nav-season { font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:3px; color:var(--muted); display:flex;align-items:center;gap:6px; }
+.blink { width:6px;height:6px;border-radius:50%;background:var(--red);animation:blink 1s infinite; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+.page { display:none; padding-top:80px; min-height:100vh; position:relative; z-index:1; }
+.page.active { display:block; animation:pageIn 0.4s ease; }
+@keyframes pageIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+.container { max-width:1300px; margin:0 auto; padding:0 28px 60px; }
+
+/* HERO BANNER */
+.hero-banner {
+  position:relative; overflow:hidden;
+  background:linear-gradient(160deg,#0a4d1e 0%,#1a7a3a 45%,#0a3d18 100%);
+  padding:60px 28px 80px; text-align:center;
+}
+.hero-banner::before {
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 20% 50%,rgba(255,225,53,0.1) 0%,transparent 50%),
+             radial-gradient(circle at 80% 50%,rgba(255,225,53,0.07) 0%,transparent 50%);
+}
+.hero-banner::after {
+  content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:280px;height:140px;
+  border:3px solid rgba(255,255,255,0.12);
+  border-bottom:none;border-radius:140px 140px 0 0;
+}
+.eyebrow {
+  font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:5px;
+  color:var(--yellow); text-transform:uppercase; margin-bottom:10px; position:relative;z-index:1;
+}
+.hero-h1 {
+  font-family:'Anton',sans-serif;
+  font-size:clamp(50px,8vw,96px); letter-spacing:4px; line-height:0.9;
+  color:var(--white); text-shadow:0 4px 30px rgba(0,0,0,0.5);
+  position:relative;z-index:1;
+}
+.hero-h1 .accent { color:var(--yellow); display:block; }
+.hero-sub { font-size:15px; color:rgba(255,255,255,0.55); margin-top:14px; position:relative;z-index:1; }
+
+/* SCOREBOARD */
+.scoreboard {
+  background:rgba(0,0,0,0.55); border-top:3px solid var(--yellow);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  padding:14px 28px; display:flex; justify-content:center; gap:44px; flex-wrap:wrap;
+  margin-bottom:32px;
+}
+.sb-item { text-align:center; }
+.sb-val { font-family:'Anton',sans-serif; font-size:32px; color:var(--yellow); line-height:1; text-shadow:0 0 20px rgba(255,225,53,0.4); }
+.sb-label { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-top:3px; }
+
+/* CARD */
+.card {
+  background:rgba(0,0,0,0.38); border:1px solid var(--card-border);
+  border-radius:14px; padding:24px; backdrop-filter:blur(4px);
+  animation:fadeUp 0.5s ease both; transition:border-color 0.2s;
+}
+.card:hover { border-color:rgba(255,225,53,0.18); }
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.card-head {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--light-line);
+}
+.card-title { font-family:'Anton',sans-serif; font-size:18px; letter-spacing:1.5px; color:var(--white); }
+.card-badge {
+  font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:2px;
+  padding:3px 10px; border-radius:4px; text-transform:uppercase;
+  background:rgba(255,225,53,0.12); color:var(--yellow); border:1px solid rgba(255,225,53,0.25);
+}
+
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:20px; }
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+/* MINI STAT */
+.mini-stat {
+  background:rgba(0,0,0,0.3); border:1px solid var(--card-border);
+  border-radius:10px; padding:18px; text-align:center;
+  transition:all 0.2s; animation:fadeUp 0.5s ease both;
+}
+.mini-stat:hover { border-color:rgba(255,225,53,0.3); transform:translateY(-3px); }
+.mini-val { font-family:'Anton',sans-serif; font-size:40px; color:var(--yellow); line-height:1; text-shadow:0 0 15px rgba(255,225,53,0.35); }
+.mini-label { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-top:4px; }
+.mini-name { font-size:12px; color:rgba(255,255,255,0.45); margin-top:5px; }
+
+/* LEADERBOARD */
+.lb-item {
+  display:flex; align-items:center; gap:12px;
+  padding:11px 0; border-bottom:1px solid rgba(255,255,255,0.05);
+  transition:all 0.15s; cursor:default;
+}
+.lb-item:last-child { border-bottom:none; }
+.lb-item:hover { padding-left:5px; }
+.lb-num { font-family:'Anton',sans-serif; font-size:22px; min-width:30px; text-align:center; }
+.lb-num.g { color:var(--yellow); text-shadow:0 0 12px rgba(255,225,53,0.6); }
+.lb-num.s { color:#ccc; }
+.lb-num.b { color:#cd8c4a; }
+.lb-num.r { color:var(--muted); font-size:14px; }
+.lb-info { flex:1; }
+.lb-name { font-family:'Oswald',sans-serif; font-size:15px; font-weight:600; color:var(--white); }
+.lb-detail { font-size:12px; color:var(--muted); margin-top:1px; }
+.lb-score { font-family:'Anton',sans-serif; font-size:30px; color:var(--yellow); text-shadow:0 0 10px rgba(255,225,53,0.3); }
+.lb-bar-bg { width:48px; height:3px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden; margin-top:4px; }
+.lb-bar-fill { height:100%; background:linear-gradient(90deg,#22963f,var(--yellow)); border-radius:2px; }
+
+/* PLAYER CARDS */
+.filter-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+.fpill {
+  padding:6px 16px; border-radius:100px;
+  border:1px solid var(--card-border); background:transparent;
+  color:var(--muted); font-family:'Oswald',sans-serif;
+  font-size:12px; letter-spacing:1.5px; text-transform:uppercase;
+  cursor:pointer; transition:all 0.15s;
+}
+.fpill:hover,.fpill.active { border-color:var(--yellow); color:var(--yellow); background:rgba(255,225,53,0.08); }
+
+.pgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; margin-bottom:28px; }
+.pcard {
+  background:rgba(0,0,0,0.42); border:1px solid var(--card-border);
+  border-radius:12px; padding:18px 16px;
+  transition:all 0.2s; cursor:default; animation:fadeUp 0.4s ease both;
+}
+.pcard:hover { border-color:rgba(255,225,53,0.4); transform:translateY(-4px); box-shadow:0 14px 40px rgba(0,0,0,0.4); }
+.pcard-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+.pcard-rating { font-family:'Anton',sans-serif; font-size:38px; color:var(--yellow); line-height:1; text-shadow:0 0 20px rgba(255,225,53,0.4); }
+.ptag { font-family:'Oswald',sans-serif; font-size:11px; font-weight:600; padding:3px 8px; border-radius:4px; letter-spacing:1px; }
+.ptag-FW { background:rgba(232,0,45,0.2); color:#ff4d6d; border:1px solid rgba(232,0,45,0.35); }
+.ptag-MF { background:rgba(26,122,58,0.35); color:#4eff8a; border:1px solid rgba(26,150,63,0.4); }
+.ptag-DF { background:rgba(135,206,235,0.12); color:var(--sky); border:1px solid rgba(135,206,235,0.3); }
+.ptag-GK { background:rgba(255,225,53,0.12); color:var(--yellow); border:1px solid rgba(255,225,53,0.3); }
+.pcard-name { font-family:'Oswald',sans-serif; font-size:16px; font-weight:700; color:var(--white); }
+.pcard-club { font-size:12px; color:var(--muted); margin-bottom:12px; }
+.pcard-stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+.pstat { text-align:center; background:rgba(255,255,255,0.04); border-radius:6px; padding:6px 4px; }
+.pstat-val { font-family:'Anton',sans-serif; font-size:18px; line-height:1; }
+.pstat-val.g { color:#4eff8a; }
+.pstat-val.a { color:var(--sky); }
+.pstat-val.m { color:var(--white); }
+.pstat-label { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+.pcard-nation { font-size:11px; color:var(--muted); margin-top:10px; text-align:right; }
+
+/* MATCH PAGE */
+.match-marquee { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:28px; }
+@media(max-width:750px){.match-marquee{grid-template-columns:1fr;}}
+.match-big {
+  background:rgba(0,0,0,0.48); border:1px solid var(--card-border);
+  border-radius:14px; padding:22px; text-align:center; transition:all 0.2s;
+}
+.match-big:hover { border-color:rgba(255,225,53,0.3); }
+.mcomp { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:3px; color:var(--yellow); text-transform:uppercase; margin-bottom:12px; }
+.mteams { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; }
+.mteam { font-family:'Oswald',sans-serif; font-size:13px; font-weight:700; flex:1; }
+.mteam.home { text-align:right; }
+.mteam.away { text-align:left; }
+.mscore { font-family:'Anton',sans-serif; font-size:44px; letter-spacing:4px; color:var(--yellow); text-shadow:0 0 25px rgba(255,225,53,0.5); }
+.mdate { font-size:11px; color:var(--muted); }
+.mtotal { font-size:11px; color:rgba(255,255,255,0.35); margin-top:6px; }
+.mtotal span { color:var(--yellow); font-weight:700; }
+
+.match-list { display:flex; flex-direction:column; gap:9px; }
+.mrow {
+  background:rgba(0,0,0,0.3); border:1px solid var(--card-border);
+  border-radius:10px; padding:14px 18px;
+  display:grid; grid-template-columns:1fr auto 1fr auto;
+  align-items:center; gap:14px; transition:all 0.2s;
+}
+.mrow:hover { border-color:rgba(255,225,53,0.2); background:rgba(255,225,53,0.02); }
+.mrow-home { font-family:'Oswald',sans-serif; font-size:14px; font-weight:600; text-align:right; }
+.mrow-away { font-family:'Oswald',sans-serif; font-size:14px; font-weight:600; }
+.mrow-score { font-family:'Anton',sans-serif; font-size:24px; color:var(--yellow); letter-spacing:3px; min-width:68px; text-align:center; background:rgba(255,225,53,0.07); padding:3px 10px; border-radius:6px; }
+.mrow-meta { text-align:right; }
+.mrow-comp { font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:1.5px; padding:2px 7px; border-radius:3px; background:rgba(255,255,255,0.06); color:var(--muted); display:inline-block; margin-bottom:2px; }
+.mrow-date { font-size:11px; color:var(--muted); }
+
+/* RADAR */
+.rtabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.rtab {
+  padding:5px 12px; border-radius:100px; border:1px solid var(--card-border);
+  background:transparent; color:var(--muted);
+  font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+  cursor:pointer; transition:all 0.15s;
+}
+.rtab:hover,.rtab.active { border-color:var(--yellow); color:var(--yellow); background:rgba(255,225,53,0.08); }
+
+/* LOADING */
+#loading {
+  position:fixed; inset:0; background:var(--grass);
+  display:flex; align-items:center; justify-content:center;
+  z-index:200; flex-direction:column; gap:18px;
+}
+.load-ball { font-size:64px; animation:spin-slow 1.5s linear infinite; }
+#loading h2 { font-family:'Anton',sans-serif; font-size:34px; letter-spacing:5px; color:var(--yellow); }
+#loading p { font-family:'Oswald',sans-serif; font-size:13px; letter-spacing:2px; color:var(--muted); }
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--grass)}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-ball">⚽</div>
+  <h2>KICKOFF</h2>
+  <p>Loading stadium...</p>
+</div>
+
+<div id="app" style="display:none;">
+
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <div class="nav-ball">⚽</div>
+      <div class="nav-brand">FOOT<span>STATS</span></div>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('overview',this)">Overview</button>
+      <button class="nav-tab" onclick="showPage('players',this)">Players</button>
+      <button class="nav-tab" onclick="showPage('matches',this)">Matches</button>
+    </div>
+    <div class="nav-season"><div class="blink"></div> SEASON 23/24</div>
+  </div>
+</nav>
+
+<!-- PAGE 1: OVERVIEW -->
+<div class="page active" id="page-overview">
+  <div class="hero-banner">
+    <div class="eyebrow">⚽ Season 2023 / 2024 — Full Analysis</div>
+    <div class="hero-h1">FOOTBALL<span class="accent">STATS</span></div>
+    <div class="hero-sub" id="hero-sub"></div>
+  </div>
+  <div class="scoreboard" id="scoreboard"></div>
+  <div class="container">
+    <div class="grid-3" id="mini-stats" style="margin-bottom:24px;"></div>
+    <div class="grid-2">
+      <div class="card" style="animation-delay:.1s">
+        <div class="card-head"><div class="card-title">GOALS BY NATION</div><div class="card-badge">International</div></div>
+        <canvas id="nationChart" style="max-height:230px;"></canvas>
+      </div>
+      <div class="card" style="animation-delay:.15s">
+        <div class="card-head"><div class="card-title">BY POSITION</div><div class="card-badge">Role</div></div>
+        <canvas id="posChart" style="max-height:230px;"></canvas>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card" style="animation-delay:.2s">
+        <div class="card-head"><div class="card-title">🥇 TOP SCORERS</div><div class="card-badge">Goals</div></div>
+        <div id="scorers-lb"></div>
+      </div>
+      <div class="card" style="animation-delay:.25s">
+        <div class="card-head"><div class="card-title">🎯 TOP ASSISTERS</div><div class="card-badge">Assists</div></div>
+        <div id="assisters-lb"></div>
+      </div>
+    </div>
+    <div class="card" style="animation-delay:.3s">
+      <div class="card-head"><div class="card-title">🏟️ CLUB GOALS</div><div class="card-badge">Output</div></div>
+      <canvas id="clubChart" style="max-height:200px;"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 2: PLAYERS -->
+<div class="page" id="page-players">
+  <div class="hero-banner" style="padding:40px 28px 60px;">
+    <div class="eyebrow">Squad Database</div>
+    <div class="hero-h1" style="font-size:clamp(38px,6vw,72px);">ALL PLAYERS</div>
+    <div class="hero-sub">30 elite footballers — stats, ratings & radar</div>
+  </div>
+  <div style="background:rgba(0,0,0,0.4);border-bottom:1px solid var(--card-border);padding:12px 28px;">
+    <div style="max-width:1300px;margin:0 auto;">
+      <div class="filter-row" id="pos-filters">
+        <button class="fpill active" onclick="filterPlayers('ALL',this)">All</button>
+        <button class="fpill" onclick="filterPlayers('FW',this)">⚡ Forwards</button>
+        <button class="fpill" onclick="filterPlayers('MF',this)">🎯 Midfielders</button>
+        <button class="fpill" onclick="filterPlayers('DF',this)">🛡️ Defenders</button>
+        <button class="fpill" onclick="filterPlayers('GK',this)">🧤 Goalkeepers</button>
+      </div>
+    </div>
+  </div>
+  <div class="container" style="padding-top:24px;">
+    <div class="pgrid" id="player-grid"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head"><div class="card-title">⭐ TOP RATED</div><div class="card-badge">Overall</div></div>
+        <div id="rated-lb"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">🕸️ PLAYER RADAR</div><div class="card-badge">Attributes</div></div>
+        <div class="rtabs" id="radar-tabs"></div>
+        <canvas id="radarChart" style="max-height:260px;"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 3: MATCHES -->
+<div class="page" id="page-matches">
+  <div class="hero-banner" style="padding:40px 28px 60px;">
+    <div class="eyebrow">Match Center</div>
+    <div class="hero-h1" style="font-size:clamp(38px,6vw,72px);">FIXTURES &<span class="accent">RESULTS</span></div>
+    <div class="hero-sub">Top matches across all competitions</div>
+  </div>
+  <div class="container" style="padding-top:28px;">
+    <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;">🔥 Biggest Matches</div>
+    <div class="match-marquee" id="match-marquee"></div>
+    <div class="filter-row" id="comp-filters" style="margin-bottom:16px;"></div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-head">
+        <div class="card-title">ALL RESULTS</div>
+        <div class="card-badge" id="match-badge">— matches</div>
+      </div>
+      <div class="match-list" id="all-matches"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div class="card-title">GOALS BY COMPETITION</div><div class="card-badge">Breakdown</div></div>
+      <canvas id="compChart" style="max-height:200px;"></canvas>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+let D = null, radarChart = null, allPlayers = [];
+
+Chart.defaults.color = 'rgba(255,255,255,0.4)';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.08)';
+
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function makeLB(items, key, max) {
+  const medals = ['g','s','b'];
+  return items.map((p,i) => `
+    <div class="lb-item">
+      <div class="lb-num ${i<3?medals[i]:'r'}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
+      <div class="lb-info">
+        <div class="lb-name">${p.name}</div>
+        <div class="lb-detail">${p.club} · ${p.nation||p.position||''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;">
+        <div class="lb-score">${p[key]}</div>
+        <div class="lb-bar-bg"><div class="lb-bar-fill" style="width:${(p[key]/max*100).toFixed(0)}%"></div></div>
+      </div>
+    </div>`).join('');
+}
+
+function initOverview(d) {
+  document.getElementById('hero-sub').textContent = `${d.total_players} players · ${d.total_matches} matches · ${d.total_goals} goals`;
+  document.getElementById('scoreboard').innerHTML = [
+    ['⚽',d.total_goals,'Total Goals'],
+    ['🎯',d.total_assists,'Assists'],
+    ['🏟️',d.total_matches,'Matches'],
+    ['⭐',d.top_rated[0].rating,'Top Rating'],
+    ['📊',d.avg_goals_per_match,'Goals/Match'],
+  ].map(([i,v,l])=>`<div class="sb-item"><div class="sb-val">${i} ${v}</div><div class="sb-label">${l}</div></div>`).join('');
+
+  document.getElementById('mini-stats').innerHTML = [
+    [d.top_scorers[0].goals,'Top Scorer Goals',d.top_scorers[0].name],
+    [d.top_assisters[0].assists,'Top Assists',d.top_assisters[0].name],
+    [d.top_rated[0].rating,'Highest Rated',d.top_rated[0].name],
+  ].map(([v,l,n],i)=>`<div class="mini-stat" style="animation-delay:${0.05+i*0.05}s"><div class="mini-val">${v}</div><div class="mini-label">${l}</div><div class="mini-name">${n}</div></div>`).join('');
+
+  document.getElementById('scorers-lb').innerHTML = makeLB(d.top_scorers.slice(0,7),'goals',d.top_scorers[0].goals);
+  document.getElementById('assisters-lb').innerHTML = makeLB(d.top_assisters.slice(0,7),'assists',d.top_assisters[0].assists);
+
+  new Chart(document.getElementById('nationChart'),{type:'bar',data:{labels:Object.keys(d.nation_goals),datasets:[{data:Object.values(d.nation_goals),backgroundColor:'rgba(255,225,53,0.72)',borderRadius:5,borderSkipped:false}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.06)'},ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}}},y:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.8)',font:{size:11,weight:'600'}}}}}});
+
+  const pc={FW:'#ff4d6d',MF:'#4eff8a',DF:'#87ceeb',GK:'#ffe135'};
+  new Chart(document.getElementById('posChart'),{type:'doughnut',data:{labels:Object.keys(d.pos_goals),datasets:[{data:Object.values(d.pos_goals),backgroundColor:Object.keys(d.pos_goals).map(k=>pc[k]),borderWidth:0,hoverOffset:8}]},options:{cutout:'68%',plugins:{legend:{position:'bottom',labels:{color:'rgba(255,255,255,0.5)',font:{size:11},padding:14}}}}});
+
+  new Chart(document.getElementById('clubChart'),{type:'bar',data:{labels:Object.keys(d.top_clubs),datasets:[{data:Object.keys(d.top_clubs).map(c=>d.top_clubs[c].goals),backgroundColor:Object.keys(d.top_clubs).map((_,i)=>`hsl(${130+i*15},65%,${44+i*3}%)`),borderRadius:6,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.7)',font:{size:10,weight:'600'}}},y:{grid:{color:'rgba(255,255,255,0.06)'},ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}}}}}});
+}
+
+function initPlayers(d) {
+  allPlayers = d.all_players;
+  renderPGrid(allPlayers);
+  document.getElementById('rated-lb').innerHTML = makeLB(d.top_rated.slice(0,7),'rating',100);
+  document.getElementById('radar-tabs').innerHTML = d.radar_players.map((p,i)=>`<button class="rtab ${i===0?'active':''}" onclick="switchRadar(${i},this)">${p.name.split(' ').slice(-1)[0]}</button>`).join('');
+  drawRadar(d,0);
+}
+
+function renderPGrid(players) {
+  document.getElementById('player-grid').innerHTML = players.map((p,i)=>`
+    <div class="pcard" style="animation-delay:${i*0.035}s">
+      <div class="pcard-top"><div class="pcard-rating">${p.rating}</div><span class="ptag ptag-${p.position}">${p.position}</span></div>
+      <div class="pcard-name">${p.name}</div>
+      <div class="pcard-club">${p.club}</div>
+      <div class="pcard-stats">
+        <div class="pstat"><div class="pstat-val g">${p.goals}</div><div class="pstat-label">Goals</div></div>
+        <div class="pstat"><div class="pstat-val a">${p.assists}</div><div class="pstat-label">Ast</div></div>
+        <div class="pstat"><div class="pstat-val m">${p.matches}</div><div class="pstat-label">Apps</div></div>
+      </div>
+      <div class="pcard-nation">🌍 ${p.nation} · ${p.age}y</div>
+    </div>`).join('');
+}
+
+function filterPlayers(pos,btn) {
+  document.querySelectorAll('#pos-filters .fpill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPGrid(pos==='ALL'?allPlayers:allPlayers.filter(p=>p.position===pos));
+}
+
+function drawRadar(d,idx) {
+  const p=d.radar_players[idx];
+  if(radarChart) radarChart.destroy();
+  radarChart=new Chart(document.getElementById('radarChart'),{type:'radar',data:{labels:Object.keys(p.stats),datasets:[{label:p.name,data:Object.values(p.stats),backgroundColor:'rgba(255,225,53,0.1)',borderColor:'rgba(255,225,53,0.9)',borderWidth:2,pointBackgroundColor:'#ffe135',pointRadius:5}]},options:{scales:{r:{min:0,max:100,grid:{color:'rgba(255,255,255,0.07)'},angleLines:{color:'rgba(255,255,255,0.07)'},ticks:{display:false},pointLabels:{color:'rgba(255,255,255,0.8)',font:{size:11,weight:'600',family:'Oswald'}}}},plugins:{legend:{display:false}}}});
+}
+
+function switchRadar(idx,btn) {
+  document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  drawRadar(D,idx);
+}
+
+function initMatches(d) {
+  // marquee top 3
+  document.getElementById('match-marquee').innerHTML = d.high_scoring.slice(0,3).map(m=>{
+    const [h,a]=m.score.split('–').map(Number);
+    return `<div class="match-big"><div class="mcomp">${m.comp}</div><div class="mteams"><div class="mteam home">${m.home}</div><div class="mscore">${m.score}</div><div class="mteam away">${m.away}</div></div><div class="mdate">${m.date}</div><div class="mtotal">Total goals: <span>${h+a}</span></div></div>`;
+  }).join('');
+
+  // comp filters
+  const comps=['All',...new Set(d.high_scoring.map(m=>m.comp))];
+  document.getElementById('comp-filters').innerHTML=comps.map((c,i)=>`<button class="fpill ${i===0?'active':''}" onclick="filterMatches('${c}',this)">${c}</button>`).join('');
+
+  renderMatches(d.high_scoring);
+
+  new Chart(document.getElementById('compChart'),{type:'bar',data:{labels:Object.keys(d.comp_goals),datasets:[{data:Object.values(d.comp_goals),backgroundColor:['#ffe135','#4eff8a','#87ceeb','#ff4d6d','#a78bfa'],borderRadius:8,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'rgba(255,255,255,0.7)',font:{size:11,weight:'600',family:'Oswald'}}},y:{grid:{color:'rgba(255,255,255,0.06)'},ticks:{color:'rgba(255,255,255,0.4)',font:{size:10}}}}}});
+}
+
+function renderMatches(matches) {
+  document.getElementById('match-badge').textContent=`${matches.length} matches`;
+  document.getElementById('all-matches').innerHTML=matches.map(m=>`
+    <div class="mrow">
+      <div class="mrow-home">${m.home}</div>
+      <div class="mrow-score">${m.score}</div>
+      <div class="mrow-away">${m.away}</div>
+      <div class="mrow-meta"><div class="mrow-comp">${m.comp}</div><div class="mrow-date">${m.date}</div></div>
+    </div>`).join('');
+}
+
+function filterMatches(comp,btn) {
+  document.querySelectorAll('#comp-filters .fpill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMatches(comp==='All'?D.high_scoring:D.high_scoring.filter(m=>m.comp===comp));
+}
+
+fetch('data.json')
+  .then(r=>r.json())
+  .then(d=>{
+    D=d;
+    initOverview(d);
+    initPlayers(d);
+    initMatches(d);
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='block';
+  })
+  .catch(()=>{
+    document.getElementById('loading').innerHTML=`<div style="font-size:50px">⚠️</div><h2 style="color:#ff4d6d;font-family:Anton,sans-serif;letter-spacing:3px;">DATA NOT FOUND</h2><p style="font-family:Oswald,sans-serif;letter-spacing:2px;">Run <code style="background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:4px;color:#ffe135">python analyze.py</code> first</p>`;
+  });
+</script>
+</body>
+</html>
